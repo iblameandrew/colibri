@@ -1445,6 +1445,28 @@ mimo-tiny-serve-check: mimo-tiny-generate mimo$(EXE)
 	$(PYTHON) -m unittest -v tests.test_mimo_prefix_serve tests.test_brio_serve.MimoBrioServe \
 		tests.test_systemone_api.MimoSystemOneEndToEnd
 
+# Ling-3.0-flash (BailingMoeV3, 124B/5.1B): one file reading the official
+# BF16 checkpoint as it is -- dense resident, routed experts streamed per
+# layer with a per-layer LRU (no CUDA/Metal/Vulkan tier in this revision).
+ifneq ($(EXE),)
+.PHONY: ling30
+ling30: ling30$(EXE)
+endif
+ling30$(EXE): ling30.c .build-config
+	$(CC) $(CFLAGS) ling30.c -o ling30$(EXE) $(LDFLAGS)
+
+# Tiny Ling-3.0 fixture + oracle, the mimo/kimi pattern: the generator is
+# numpy-only and deterministic; ref.json is committed and comes from the
+# vendor modeling code path (tools/make_ling30_tiny.py), so CI needs neither
+# torch nor network.
+.PHONY: ling30-tiny-generate ling30-tiny-check
+ling30-tiny-generate:
+	$(PYTHON) tools/make_ling30_tiny.py --out ./ling30_tiny
+
+ling30-tiny-check: ling30-tiny-generate ling30$(EXE)
+	OMP_NUM_THREADS=2 SNAP=./ling30_tiny ./ling30$(EXE) 2 8 ./ling30_tiny/ref.json
+	$(PYTHON) tests/test_ling30_chat_template.py
+
 # Qwen3.8-Flash-Next text-only sibling. qwen38.c owns the direct checkpoint
 # loader and SERVE=1 protocol. With CUDA=1 it links the same expert tier as
 # qwen36 (fp8 streaming mode: hot experts get VRAM copies, the RAM LRU stays);
@@ -2917,7 +2939,7 @@ check:
 	$(MAKE) portable
 	$(MAKE) test
 
-install: colibri$(EXE) glm53$(EXE) inkling$(EXE) kimi_k3$(EXE) olmoe$(EXE) qwen36$(EXE) qwen38$(EXE) deepseek_v41$(EXE) mimo$(EXE) qwenimage$(EXE) laya$(EXE) gliner_decide$(EXE) \
+install: colibri$(EXE) glm53$(EXE) inkling$(EXE) kimi_k3$(EXE) olmoe$(EXE) qwen36$(EXE) qwen38$(EXE) deepseek_v41$(EXE) mimo$(EXE) ling30$(EXE) qwenimage$(EXE) laya$(EXE) gliner_decide$(EXE) \
 	$(if $(filter 1,$(COLI_V4_SUPPORTED)),deepseek-v4,)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -d $(DESTDIR)$(LIBEXECDIR)
@@ -2935,6 +2957,7 @@ install: colibri$(EXE) glm53$(EXE) inkling$(EXE) kimi_k3$(EXE) olmoe$(EXE) qwen3
 	$(INSTALL) -m 755 gliner_decide$(EXE) $(DESTDIR)$(LIBEXECDIR)/gliner_decide$(EXE)
 	$(INSTALL) -m 755 deepseek_v41$(EXE) $(DESTDIR)$(LIBEXECDIR)/deepseek_v41$(EXE)
 	$(INSTALL) -m 755 mimo$(EXE) $(DESTDIR)$(LIBEXECDIR)/mimo$(EXE)
+	$(INSTALL) -m 755 ling30$(EXE) $(DESTDIR)$(LIBEXECDIR)/ling30$(EXE)
 	@if [ -f deepseek_v4$(EXE) ]; then \
 	  $(INSTALL) -m 755 deepseek_v4$(EXE) $(DESTDIR)$(LIBEXECDIR)/deepseek_v4$(EXE); \
 	fi

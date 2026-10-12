@@ -15,7 +15,7 @@
 
 **小さなエンジン、巨大なモデル。** colibri は、とても大きなオープンモデルを、あなたがすでに持っているマシンで動かします。数千億パラメータの Mixture-of-Experts モデルは、1 トークンごとに自分自身のごく一部しか使いません。そこで colibri はその部分を RAM に置き、残りの部分、つまりエキスパートは、モデルが必要としたときにディスクから読み込みます。純粋な C で書かれ、モデルファミリーごとにファイルは 1 つ、GPU は不要です。
 
-現在動作するエンジンは 13 個です。そのうち 10 個は言語モデル用です：**GLM-5.2/5.3**、**GLM-5.3-Flash**、**Inkling**、**Kimi K3**、**DeepSeek V4 Flash**、**DeepSeek V4.1 Flash**、**MiMo-V2.6 Flash**（と Pro）、**Qwen3.8-Flash-Next**、**Qwen3.6**（Qwen3-Coder と密モデルの Qwen3.8-27B も動かします）、そして **OLMoE**。1 個は画像を描きます：**Qwen-Image-2.1**。2 個は判定に答えます：**Laya** と **GLiNER2.5-Decide** で、さらに 3 つ目の判定モデル **Clef** が Qwen3.6 エンジンで動きます。[自分のマシンに合うのはどれか](#which-model-for-my-machine)
+現在動作するエンジンは 14 個です。そのうち 11 個は言語モデル用です：**GLM-5.2/5.3**、**GLM-5.3-Flash**、**Inkling**、**Kimi K3**、**DeepSeek V4 Flash**、**DeepSeek V4.1 Flash**、**MiMo-V2.6 Flash**（と Pro）、**Qwen3.8-Flash-Next**、**Ling-3.0-flash**、**Qwen3.6**（Qwen3-Coder と密モデルの Qwen3.8-27B も動かします）、そして **OLMoE**。1 個は画像を描きます：**Qwen-Image-2.1**。2 個は判定に答えます：**Laya** と **GLiNER2.5-Decide** で、さらに 3 つ目の判定モデル **Clef** が Qwen3.6 エンジンで動きます。[自分のマシンに合うのはどれか](#which-model-for-my-machine)
 
 ```
 $ ./coli chat
@@ -150,6 +150,7 @@ Mixture-of-Experts モデルは、ディスク上では巨大でも、1 トー�
 | **DeepSeek V4 Flash**（284B）：ツール対応 | `deepseek-v4-flash` | 167 GB | 16 / 32 GB | CUDA、Vulkan | CPU のみで、32 GB（Ryzen 7 5800X）なら 0.93 tok/s、63 GB（Ryzen 9 5950X）なら 1.24。CUDA で 1.5-1.6（RTX 5080、32 GB、NVMe 2 台） |
 | **MiMo-V2.6 Flash**（309B）：ビジョンとツール | `mimo-v2.6-flash` | 172 GB | 32 / 52 GB | Vulkan | 2.34-3.37 tok/s（A、CPU） |
 | **Qwen3.8-Flash-Next**（125B + 51B n-gram）：ビジョンとツール | `qwen38-flash-next` | 186 GB | 24 / 32 GB | CUDA、Vulkan（内蔵 GPU も） | レイヤーあたり 32-96 エキスパートで 1.91-2.56 tok/s。オプションの int4 エキスパートで 3.99（A、CPU） |
+| **Ling-3.0-flash**（124B）：KDA+MLA ハイブリッド MoE、ツール対応 | `ling-3.0-flash` | 245 GB | 16 / 32 GB | CPU | 未計測 |
 | **GLM-5.2**（744B）：リファレンスモデル、MTP ヘッド付き | `glm-5.2` | 429 GB | 16 / 24 GB | CUDA、Vulkan | 25 GB のラップトップでコールド時 0.05-0.1 tok/s。128 GB の Ryzen AI Max+ 395 で 1.83。6x RTX 5090 で 9.0-9.2 |
 | GLM-5.3（744B）：同じエンジン、MTP ヘッドなし | `glm-5.3` | 419 GB | 16 / 24 GB | CUDA、Vulkan | |
 | **Inkling**（975B）：int4 エキスパート、bf16 の密な重み | `inkling` | 514 GB | ダウンロードしたままなら 120 / 128 GB。[密な重みの変換](docs/inkling.md)後は 25 GB | CUDA、Vulkan | 0.25 tok/s（Ryzen 9 7900、187 GB、RTX A6000） |
@@ -416,6 +417,7 @@ c/
 ├── deepseek_v4.c         DeepSeek V4 Flash  (make deepseek-v4)
 ├── deepseek_v41.c        DeepSeek V4.1 Flash  (make deepseek_v41)
 ├── mimo.c                MiMo-V2.6 Flash and Pro  (make mimo)
+├── ling30.c              Ling-3.0-flash  (make ling30)
 ├── qwen38.c              Qwen3.8-Flash-Next  (make qwen38)
 ├── qwen36.c              Qwen3.6, Qwen3-Coder, Qwen3.8-27B, Clef  (make qwen36)
 ├── olmoe.c               OLMoE  (make olmoe)

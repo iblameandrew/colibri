@@ -20,10 +20,10 @@ sehingga colibri menyimpan bagian itu di RAM dan membaca sisanya, yaitu para
 pakar, dari disk ketika model membutuhkannya. C murni, satu file per keluarga
 model, tanpa memerlukan GPU.
 
-Saat ini ada tiga belas engine yang dapat dijalankan. Sepuluh di antaranya untuk
+Saat ini ada empat belas engine yang dapat dijalankan. Sebelas di antaranya untuk
 model bahasa: **GLM-5.2/5.3**, **GLM-5.3-Flash**, **Inkling**, **Kimi K3**,
 **DeepSeek V4 Flash**, **DeepSeek V4.1 Flash**, **MiMo-V2.6 Flash** (dan Pro),
-**Qwen3.8-Flash-Next**, **Qwen3.6** (yang juga menjalankan Qwen3-Coder dan model
+**Qwen3.8-Flash-Next**, **Ling-3.0-flash**, **Qwen3.6** (yang juga menjalankan Qwen3-Coder dan model
 dense Qwen3.8-27B), serta **OLMoE**. Satu menghasilkan gambar:
 **Qwen-Image-2.1**. Dua digunakan untuk menjawab pertanyaan pengambilan keputusan:
 **Laya** dan **GLiNER2.5-Decide**, dengan model keputusan ketiga, **Clef**, pada
@@ -227,7 +227,9 @@ kecepatan: drive NVMe yang cepat paling membantu)
 | DeepSeek V4 Flash REAP 150B: 132 dari 256 pakar | `deepseek-v4-flash-reap` | 85 GB | 16 / 32 GB | CUDA, Vulkan | |
 | **DeepSeek V4 Flash** (284B): tools | `deepseek-v4-flash` | 167 GB | 16 / 32 GB | CUDA, Vulkan | 0.93 tok/s dengan 32 GB (Ryzen 7 5800X), 1.24 dengan 63 GB (Ryzen 9 5950X), hanya CPU; 1.5-1.6 dengan CUDA (RTX 5080, 32 GB, dua NVMe) |
 | **MiMo-V2.6 Flash** (309B): vision dan tools | `mimo-v2.6-flash` | 172 GB | 32 / 52 GB | Vulkan | 2.34-3.37 tok/s (A, CPU) |
-| **Qwen3.8-Flash-Next** (125B + 51B n-gram): vision dan tools | `qwen38-flash-next` | 186 GB | 24 / 32 GB | CUDA, Vulkan (termasuk terintegrasi) | 1.91-2.56 tok/s dengan 32-96 pakar per layer; 3.99 dengan pakar int4 opsional (A, CPU) |
+| **Qwen3.8-Flash-Next** (125B + 51B n-gram): vision dan tools | `qwen38-flash-next` | 186 GB | 24 / 32 GB | CUDA, Vulkan (termasuk terintegrasi) | 1.91-2.56 tok/s dengan 32-96 pakar per layer; 3.99 dengan pakar int4
+opsional (A, CPU) |
+| **Ling-3.0-flash** (124B): hybrid KDA+MLA MoE dengan tools | `ling-3.0-flash` | 245 GB | 16 / 32 GB | CPU | belum diukur |
 | **GLM-5.2** (744B): model referensi, dengan MTP head | `glm-5.2` | 429 GB | 16 / 24 GB | CUDA, Vulkan | 0.05-0.1 tok/s cold pada laptop 25 GB; 1.83 pada Ryzen AI Max+ 395 dengan 128 GB; 9.0-9.2 pada 6x RTX 5090 |
 | GLM-5.3 (744B): engine yang sama, tanpa MTP head | `glm-5.3` | 419 GB | 16 / 24 GB | CUDA, Vulkan | |
 | **Inkling** (975B): pakar int4, bobot dense bf16 | `inkling` | 514 GB | 120 / 128 GB sebagaimana diunduh; 25 GB setelah [konversi dense](docs/inkling.md) | CUDA, Vulkan | 0.25 tok/s (Ryzen 9 7900, 187 GB, RTX A6000) |
@@ -711,6 +713,7 @@ c/
 ├── deepseek_v4.c         DeepSeek V4 Flash  (make deepseek-v4)
 ├── deepseek_v41.c        DeepSeek V4.1 Flash  (make deepseek_v41)
 ├── mimo.c                MiMo-V2.6 Flash and Pro  (make mimo)
+├── ling30.c              Ling-3.0-flash  (make ling30)
 ├── qwen38.c              Qwen3.8-Flash-Next  (make qwen38)
 ├── qwen36.c              Qwen3.6, Qwen3-Coder, Qwen3.8-27B, Clef  (make qwen36)
 ├── olmoe.c               OLMoE  (make olmoe)

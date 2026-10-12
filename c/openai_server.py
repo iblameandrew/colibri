@@ -1054,6 +1054,8 @@ def _parse_arch_tool_calls(reply, tools, tool_reply, track_spans):
         return parse_qwen_tool_calls(reply, tools) + (None, None)
     if ARCH == "mimo":
         return _parse_mimo_tool_calls(reply, tools, track_spans)
+    if ARCH == "ling30":
+        return parse_ling30_tool_calls(reply, tools) + (None, None)
     return _parse_tool_calls(reply, tools, track_spans)
 
 
@@ -2506,6 +2508,143 @@ def render_chat_qwen38(messages, enable_thinking=True, reasoning_effort=None, to
     return "".join(parts)
 
 
+def render_chat_ling30(messages, enable_thinking=True, reasoning_effort=None, tools=None,
+                       tool_choice=None, add_generation_prompt=True):
+    """Ling-3.0-flash's native chat template (chat_template.jinja).
+
+    Roles are explicit frames: `<role>SYSTEM|HUMAN|ASSISTANT|OBSERVATION</role>`
+    closed by `<|role_end|>`. OpenAI roles map system->SYSTEM, user->HUMAN,
+    assistant->ASSISTANT, tool->OBSERVATION (wrapped in `<tool_response>`).
+    Thinking on leaves the cue `<role>ASSISTANT</role>\\n<think>` open; off
+    closes it (`<think></think>`). Tools are declared once as
+    `<tools>{json}</tools>` plus the instruction to emit
+    `<tool_call>{name}<arg_key>k</arg_key>\\n<arg_value>v</arg_value>...</tool_call>`.
+    add_generation_prompt=False continues a trailing assistant turn (no cue).
+    """
+    if not isinstance(messages, list) or not messages:
+        raise APIError(400, "`messages` must be a non-empty array.", "messages")
+    if tool_choice in ("none",):
+        tools = None
+    if tools is not None and not isinstance(tools, list):
+        raise APIError(400, "`tools` must be an array.", "tools")
+    parts = []
+    if tools:
+        block = "<tools>" + json.dumps(
+            [{"name": (t.get("function", t) or {}).get("name"),
+              "description": (t.get("function", t) or {}).get("description", ""),
+              "parameters": (t.get("function", t) or {}).get("parameters", {})}
+             for t in tools if isinstance(t, dict)], ensure_ascii=False) + "</tools>"
+        instruction = ("You may call one or more tools. Emit each call as "
+                       "<tool_call>{function name}<arg_key>key</arg_key>\n"
+                       "<arg_value>value</arg_value>...</tool_call>.")
+        if tool_choice == "required":
+            instruction += TOOL_CHOICE_REQUIRED_INSTRUCTION
+        parts.append(f"<role>SYSTEM</role>\n{block}\n{instruction}<|role_end|>")
+    last = len(messages) - 1
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
+            raise APIError(400, "Each message must be an object.", f"messages.{index}")
+        role = message.get("role")
+        if role == "developer":
+            role = "system"
+        if role not in ("system", "user", "assistant", "tool"):
+            raise APIError(400, f"Unsupported role {role!r}.", f"messages.{index}.role")
+        raw = message.get("content")
+        body = content_text(raw, f"messages.{index}.content") if raw is not None else ""
+        native = {"system": "SYSTEM", "user": "HUMAN", "assistant": "ASSISTANT",
+                  "tool": "OBSERVATION"}[role]
+        if role == "assistant":
+            reasoning = message.get("reasoning_content")
+            if reasoning is not None and not isinstance(reasoning, str):
+                raise APIError(400, "`reasoning_content` must be a string.",
+                               f"messages.{index}.reasoning_content")
+            turn = f"<role>ASSISTANT</role>\n<think>{reasoning or ''}</think>{body}"
+            calls = message.get("tool_calls")
+            if calls:
+                if not isinstance(calls, list):
+                    raise APIError(400, "`tool_calls` must be an array.",
+                                   f"messages.{index}.tool_calls")
+                for call in calls:
+                    fn = (call.get("function") or {}) if isinstance(call, dict) else {}
+                    name = fn.get("name", "")
+                    try:
+                        args = json.loads(fn.get("arguments", "{}") or "{}")
+                    except (TypeError, ValueError):
+                        args = {}
+                    chunk = f"<tool_call>{name}"
+                    if isinstance(args, dict):
+                        for k, v in args.items():
+                            chunk += f"<arg_key>{k}</arg_key>\n<arg_value>{v}</arg_value>"
+                    chunk += "</tool_call>"
+                    turn += chunk
+            if not add_generation_prompt and index == last:
+                parts.append(turn)
+                return "".join(parts)
+            parts.append(turn + "<|role_end|>")
+            continue
+        if role == "tool":
+            parts.append(f"<role>OBSERVATION</role>\n<tool_response>{body}</tool_response><|role_end|>")
+            continue
+        parts.append(f"<role>{native}</role>\n{body}<|role_end|>")
+    if add_generation_prompt:
+        parts.append("<role>ASSISTANT</role>\n")
+        parts.append("<think>" if enable_thinking else "<think></think>")
+    return "".join(parts)
+
+
+LING30_CALL_RE = re.compile(r"<tool_call>(.*?)</tool_call>", re.S)
+LING30_ARG_RE = re.compile(r"<arg_key>(.*?)</arg_key>\s*<arg_value>(.*?)</arg_value>", re.S)
+
+
+def parse_ling30_tool_calls(reply, tools=None):
+    """Ling-3.0's calls back into OpenAI `tool_calls`: `(content, tool_calls)`."""
+    schema = {}
+    for tool in (tools or []):
+        fn = tool.get("function", tool) if isinstance(tool, dict) else {}
+        name = fn.get("name")
+        params = (fn.get("parameters") or {}).get("properties") or {}
+        if isinstance(name, str) and name and isinstance(params, dict):
+            schema[name] = params
+
+    def make_call(name, body):
+        args = {}
+        for key, raw in LING30_ARG_RE.findall(body):
+            key = key.strip()
+            raw = raw.strip("\n")
+            declared = (schema.get(name) or {}).get(key) or {}
+            kind = declared.get("type") if isinstance(declared, dict) else None
+            args[key] = _coerce_arg(raw, kind if isinstance(kind, str) else None) \
+                if kind not in (None, "string") else raw
+        rest = LING30_ARG_RE.sub("", body).strip()
+        if not args and rest:
+            try:
+                parsed = json.loads(rest)
+                if isinstance(parsed, dict):
+                    args = parsed
+            except (TypeError, ValueError):
+                pass
+        if not args and "<arg_key>" not in body and body.strip():
+            name_guess, _, tail = body.strip().partition("\n")
+            if name_guess and not name:
+                name = name_guess.strip()
+                body = tail
+        return {"id": f"call_{uuid.uuid4().hex[:24]}", "type": "function",
+                "function": {"name": name, "arguments": json.dumps(args, ensure_ascii=False)}}
+
+    text = reply or ""
+    calls = []
+    for m in LING30_CALL_RE.finditer(text):
+        inner = m.group(1)
+        head, _, tail = inner.partition("<arg_key>")
+        name = head.strip().split("\n")[0].strip() if head.strip() else ""
+        calls.append(make_call(name, "<arg_key>" + tail if "<arg_key>" in inner else inner))
+    if not calls and tools and "<tool_call>" in text:
+        sys.stderr.write("[api] ling30 tool markers present but no call parsed -- "
+                         "possibly truncated or mangled output\n")
+        sys.stderr.flush()
+    return LING30_CALL_RE.sub("", text).strip(), calls
+
+
 def render_chat_inkling(messages, enable_thinking=False, reasoning_effort=None, tools=None,
                         tool_choice=None, audio_out=None, add_generation_prompt=True):
     """Text-only subset of Inkling's chat_template.jinja: role tokens with
@@ -3503,6 +3642,9 @@ def render_chat_for_arch(messages, enable_thinking=False, reasoning_effort=None,
     if ARCH == "mimo":
         return render_chat_mimo(messages, enable_thinking, reasoning_effort, tools,
                                 tool_choice, add_generation_prompt)
+    if ARCH == "ling30":
+        return render_chat_ling30(messages, enable_thinking, reasoning_effort, tools,
+                                  tool_choice, add_generation_prompt)
     return render_chat(messages, enable_thinking, reasoning_effort, tools, tool_choice)
 
 

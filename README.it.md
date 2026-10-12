@@ -20,10 +20,10 @@ tiene quella parte in RAM e legge il resto, gli expert, dal disco quando il
 modello li chiede. C puro, un file per famiglia di modelli, nessuna GPU
 necessaria.
 
-Oggi girano tredici motori. Dieci sono per modelli linguistici: **GLM-5.2/5.3**,
+Oggi girano quattordici motori. Undici sono per modelli linguistici: **GLM-5.2/5.3**,
 **GLM-5.3-Flash**, **Inkling**, **Kimi K3**, **DeepSeek V4 Flash**,
 **DeepSeek V4.1 Flash**, **MiMo-V2.6 Flash** (e Pro), **Qwen3.8-Flash-Next**,
-**Qwen3.6** (che esegue anche Qwen3-Coder e il denso Qwen3.8-27B) e
+**Ling-3.0-flash**, **Qwen3.6** (che esegue anche Qwen3-Coder e il denso Qwen3.8-27B) e
 **OLMoE**. Uno disegna immagini: **Qwen-Image-2.1**. Due prendono decisioni:
 **Laya** e **GLiNER2.5-Decide**, con un terzo modello di decisione, **Clef**, sul
 motore Qwen3.6. [Quale scegliere per la mia macchina](#which-model-for-my-machine)
@@ -220,7 +220,9 @@ velocità la decide il disco: un NVMe veloce è ciò che aiuta di più)
 | DeepSeek V4 Flash REAP 150B: 132 dei 256 expert | `deepseek-v4-flash-reap` | 85 GB | 16 / 32 GB | CUDA, Vulkan | |
 | **DeepSeek V4 Flash** (284B): tool | `deepseek-v4-flash` | 167 GB | 16 / 32 GB | CUDA, Vulkan | 0.93 tok/s con 32 GB (Ryzen 7 5800X), 1.24 con 63 GB (Ryzen 9 5950X), solo CPU; 1.5-1.6 con CUDA (RTX 5080, 32 GB, due NVMe) |
 | **MiMo-V2.6 Flash** (309B): visione e tool | `mimo-v2.6-flash` | 172 GB | 32 / 52 GB | Vulkan | 2.34-3.37 tok/s (A, CPU) |
-| **Qwen3.8-Flash-Next** (125B + 51B n-gram): visione e tool | `qwen38-flash-next` | 186 GB | 24 / 32 GB | CUDA, Vulkan (anche integrata) | 1.91-2.56 tok/s con 32-96 expert per layer; 3.99 con gli expert int4 opzionali (A, CPU) |
+| **Qwen3.8-Flash-Next** (125B + 51B n-gram): visione e tool | `qwen38-flash-next` | 186 GB | 24 / 32 GB | CUDA, Vulkan (anche integrata) | 1.91-2.56 tok/s con 32-96 expert per layer; 3.99 con gli expert int4 opzionali
+(A, CPU) |
+| **Ling-3.0-flash** (124B): MoE ibrido KDA+MLA con tool | `ling-3.0-flash` | 245 GB | 16 / 32 GB | CPU | non misurato |
 | **GLM-5.2** (744B): il modello di riferimento, con la testa MTP | `glm-5.2` | 429 GB | 16 / 24 GB | CUDA, Vulkan | 0.05-0.1 tok/s a freddo su un portatile da 25 GB; 1.83 su un Ryzen AI Max+ 395 da 128 GB; 9.0-9.2 su 6x RTX 5090 |
 | GLM-5.3 (744B): lo stesso motore, senza testa MTP | `glm-5.3` | 419 GB | 16 / 24 GB | CUDA, Vulkan | |
 | **Inkling** (975B): expert int4, pesi densi bf16 | `inkling` | 514 GB | 120 / 128 GB così come scaricato; 25 GB dopo una [conversione della parte densa](docs/inkling.md) | CUDA, Vulkan | 0.25 tok/s (Ryzen 9 7900, 187 GB, RTX A6000) |
@@ -685,6 +687,7 @@ c/
 ├── deepseek_v4.c         DeepSeek V4 Flash  (make deepseek-v4)
 ├── deepseek_v41.c        DeepSeek V4.1 Flash  (make deepseek_v41)
 ├── mimo.c                MiMo-V2.6 Flash and Pro  (make mimo)
+├── ling30.c              Ling-3.0-flash  (make ling30)
 ├── qwen38.c              Qwen3.8-Flash-Next  (make qwen38)
 ├── qwen36.c              Qwen3.6, Qwen3-Coder, Qwen3.8-27B, Clef  (make qwen36)
 ├── olmoe.c               OLMoE  (make olmoe)

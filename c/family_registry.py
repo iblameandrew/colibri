@@ -952,6 +952,70 @@ def _mimo_resident_inventory(name, size, _config, _dtype=None):
     return 0 if _MIMO_NOT_LOADED.match(name) else size
 
 
+# Ling-3.0-flash (BailingMoeV3, inclusionAI): 42 layers, layer_group_size 6 --
+# MLA iff (i+1)%6==0 or i>=n//6*6 (7 MLA + 35 KDA, ling30.c). The MTP draft
+# layer (model.layers.42.*) is never loaded for inference, like every other
+# engine's draft head.
+_LING30_NOT_LOADED = re.compile(r"^model\.layers\.42\.")
+_LING30_EXPERT = re.compile(
+    r"^model\.layers\.(\d+)\.mlp\.experts\.(\d+)\."
+)
+
+
+def _ling30_expert_inventory(name, size, _config, _dtype=None):
+    match = _LING30_EXPERT.search(name)
+    if match is None or name.startswith("model.layers.42."):
+        return ()
+    return ((int(match.group(1)), int(match.group(2)), size),)
+
+
+def _ling30_resident_inventory(name, size, _config, _dtype=None):
+    return 0 if _LING30_NOT_LOADED.match(name) else size
+
+
+def _ling30_geometry(config, context, _model_dir):
+    """Ling-3.0-flash: hybrid 35xKDA (recurrent) + 7x gated MLA (ling30.c).
+
+    Only the MLA layers keep a positional cache (compressed latent + rope):
+        MLA cache = n_mla * context * (kv_lora_rank + qk_rope_head_dim) * 4
+    plus the per-position value rows the engine keeps beside it:
+        + n_mla * context * heads * v_head_dim * 4
+    The KDA layers carry a per-head recurrent state plus the short-conv
+    window, neither of which scales with context:
+        fixed = n_kda * (heads*hd*hd + 3*proj*kernel) * 4
+    with n_mla/n_kda from the (i+1)%group==0 rule (7/35 at group_size 6).
+    Workspace mirrors one forward pass (a pass touches one layer type):
+    the larger of the KDA and MLA prefill temporaries.
+    """
+    layers = _required_int(config, "num_hidden_layers", "ling30")
+    experts = _required_int(config, "num_experts", "ling30")
+    hidden = _required_int(config, "hidden_size", "ling30")
+    heads = _required_int(config, "num_attention_heads", "ling30")
+    kv_lora = _required_int(config, "kv_lora_rank", "ling30")
+    qk_nope = _required_int(config, "qk_nope_head_dim", "ling30")
+    qk_rope = _required_int(config, "qk_rope_head_dim", "ling30")
+    v_head = _required_int(config, "v_head_dim", "ling30")
+    group = config.get("layer_group_size", 6)
+    if not isinstance(group, int) or group < 1:
+        raise ValueError("ling30: layer_group_size must be a positive integer")
+    base = layers // group * group
+    n_mla = sum(1 for i in range(layers) if (i + 1) % group == 0 or i >= base)
+    n_kda = layers - n_mla
+    kda_hd = config.get("head_dim", 128)
+    conv_k = config.get("short_conv_kernel_size", 4)
+    for name, value in (("head_dim", kda_hd), ("short_conv_kernel_size", conv_k)):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            raise ValueError(f"ling30: {name} must be a positive integer")
+    proj = heads * kda_hd
+    state = n_mla * context * (kv_lora + qk_rope + heads * v_head) * 4
+    fixed = n_kda * (heads * kda_hd * kda_hd + 3 * proj * conv_k) * 4
+    qh = qk_nope + qk_rope
+    ws_kda = context * (6 * proj + kda_hd + hidden) * 4
+    ws_mla = context * (heads * qh + kv_lora + qk_rope +
+                        heads * (qk_nope + v_head) + 2 * heads * v_head) * 4
+    return PlannerGeometry(state, fixed, max(ws_kda, ws_mla), experts)
+
+
 _DSV41_MTP_EXPERT = re.compile(r"^mtp\.(\d+)\.ffn\.experts\.(\d+)\.")
 
 
@@ -1659,6 +1723,49 @@ FAMILIES = (
         # the gateway's cue with thinking on (render_chat_mimo): the template's
         # ChatML with no newline after <|im_end|>, and the <think> the model writes
         tune_prompt_template="<|im_start|>user\n{prompt}<|im_end|><|im_start|>assistant\n<think>",
+    ),
+    FamilyDescriptor(
+        id="ling30",
+        model_types=("bailing_hybrid", "bailing_moe_v3", "ling30"),
+        display_name="Ling-3.0-flash",
+        display_scale="124B",
+        reference_experts=512,
+        display_variants=(
+            DisplayVariant((("hidden_size", 2560), ("num_hidden_layers", 42),
+                            ("num_experts", 512)),
+                           "Ling-3.0-flash", "124B"),
+            DisplayVariant((("hidden_size", 2048), ("num_hidden_layers", 24),
+                            ("num_experts", 128)),
+                           "Ling-3.0-tiny", "7.9B", model_id="ling-3.0-tiny-colibri"),
+        ),
+        engine_artifact="ling30",
+        engine_aliases=(),
+        engine_group="ling30",
+        internal_arch="ling30",
+        build_target="ling30",
+        process_names=("ling30",),
+        default_model_id="ling-3.0-flash-colibri",
+        cli_adapter="ling30",
+        gateway_adapter="ling30",
+        planner_id="ling30_hybrid",
+        planner_geometry=_ling30_geometry,
+        planner_unsupported_reason="",
+        # No VRAM tier to plan: ling30.c is CPU-only in this revision (the
+        # KDA+MLA Vulkan chain is unmeasured, as mimo's was at introduction).
+        supports_accelerator=False,
+        expert_inventory=_ling30_expert_inventory,
+        resident_inventory=_ling30_resident_inventory,
+        config_section="root",
+        # top-8 routing: like mimo, the engine raises a smaller cache to one step
+        limits=FamilyLimits(8192, 262144, 1024, 8192, 16, 8, "LING30_MAXT"),
+        # tools (native <tool_call> form), thinking on by default (the template
+        # leaves <think> open); no grammars, no audio, text-only (no VL tower)
+        capabilities=FamilyCapabilities(True, False, False, True),
+        has_gateway_adapter=True,
+        # the engine is driven through the gateway (SERVE); coli run has no
+        # ling30 branch and would fall through to GLM's template
+        has_cli_adapter=False,
+        tune_prompt_template="<role>HUMAN</role>\n{prompt}<|role_end|><role>ASSISTANT</role>\n<think>",
     ),
     FamilyDescriptor(
         id="qwen_image",

@@ -19,10 +19,10 @@ parameters uses only a small part of itself for each token, so colibri keeps
 that part in RAM and reads the rest, the experts, from the disk when the model
 asks for them. Pure C, one file per model family, no GPU required.
 
-Thirteen engines run today. Ten are for language models: **GLM-5.2/5.3**,
+Fourteen engines run today. Eleven are for language models: **GLM-5.2/5.3**,
 **GLM-5.3-Flash**, **Inkling**, **Kimi K3**, **DeepSeek V4 Flash**,
 **DeepSeek V4.1 Flash**, **MiMo-V2.6 Flash** (and Pro), **Qwen3.8-Flash-Next**,
-**Qwen3.6** (which also runs Qwen3-Coder and the dense Qwen3.8-27B) and
+**Ling-3.0-flash**, **Qwen3.6** (which also runs Qwen3-Coder and the dense Qwen3.8-27B) and
 **OLMoE**. One draws pictures: **Qwen-Image-2.1**. Two answer decisions:
 **Laya** and **GLiNER2.5-Decide**, with a third decision model, **Clef**, on the
 Qwen3.6 engine. [Which one for my machine](#which-model-for-my-machine)
@@ -209,6 +209,7 @@ a fast NVMe drive helps most)
 | **DeepSeek V4 Flash** (284B): tools | `deepseek-v4-flash` | 167 GB | 16 / 32 GB | CUDA, Vulkan | 0.93 tok/s with 32 GB (Ryzen 7 5800X), 1.24 with 63 GB (Ryzen 9 5950X), CPU only; 1.5-1.6 with CUDA (RTX 5080, 32 GB, two NVMe) |
 | **MiMo-V2.6 Flash** (309B): vision and tools | `mimo-v2.6-flash` | 172 GB | 32 / 52 GB | Vulkan | 2.34-3.37 tok/s (A, CPU) |
 | **Qwen3.8-Flash-Next** (125B + 51B n-gram): vision and tools | `qwen38-flash-next` | 186 GB | 24 / 32 GB | CUDA, Vulkan (integrated too) | 1.91-2.56 tok/s with 32-96 experts per layer; 3.99 with the optional int4 experts (A, CPU) |
+| **Ling-3.0-flash** (124B): hybrid KDA+MLA MoE with tools | `ling-3.0-flash` | 245 GB | 16 / 32 GB | CPU | unmeasured |
 | **GLM-5.2** (744B): the reference model, with the MTP head | `glm-5.2` | 429 GB | 16 / 24 GB | CUDA, Vulkan | 0.05-0.1 tok/s cold on a 25 GB laptop; 1.83 on a 128 GB Ryzen AI Max+ 395; 9.0-9.2 on 6x RTX 5090 |
 | GLM-5.3 (744B): the same engine, no MTP head | `glm-5.3` | 419 GB | 16 / 24 GB | CUDA, Vulkan | |
 | **Inkling** (975B): int4 experts, bf16 dense weights | `inkling` | 514 GB | 120 / 128 GB as downloaded; 25 GB after a [dense conversion](docs/inkling.md) | CUDA, Vulkan | 0.25 tok/s (Ryzen 9 7900, 187 GB, RTX A6000) |
@@ -246,6 +247,7 @@ Each number comes from its model's page in [docs/](docs/) or from
 Each family has its page: [qwen36.md](docs/qwen36.md) (Qwen3.6, Qwen3-Coder,
 Qwen3.8-27B), [qwen38.md](docs/qwen38.md), [deepseek-v4.md](docs/deepseek-v4.md),
 [deepseek-v41.md](docs/deepseek-v41.md), [mimo.md](docs/mimo.md),
+[ling30.md](docs/ling30.md),
 [glm53-flash.md](docs/glm53-flash.md), [inkling.md](docs/inkling.md),
 [kimi_k3.md](docs/kimi_k3.md), [qwen-image.md](docs/qwen-image.md),
 [laya.md](docs/laya.md), [gliner_decide.md](docs/gliner_decide.md),
@@ -651,6 +653,7 @@ c/
 ├── deepseek_v4.c         DeepSeek V4 Flash  (make deepseek-v4)
 ├── deepseek_v41.c        DeepSeek V4.1 Flash  (make deepseek_v41)
 ├── mimo.c                MiMo-V2.6 Flash and Pro  (make mimo)
+├── ling30.c              Ling-3.0-flash  (make ling30)
 ├── qwen38.c              Qwen3.8-Flash-Next  (make qwen38)
 ├── qwen36.c              Qwen3.6, Qwen3-Coder, Qwen3.8-27B, Clef  (make qwen36)
 ├── olmoe.c               OLMoE  (make olmoe)

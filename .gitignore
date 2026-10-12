@@ -191,5 +191,9 @@ c/mimo_tiny/.vendor_mimo_v2/
 c/mimo_tiny/image.png
 c/mimo_tiny/image.json
 c/mimo_tiny/patches.f32
+# Ling-3.0-flash tiny fixture: config.json and ref.json are committed, the rest is regenerated
+c/ling30_tiny/*.safetensors
+c/ling30
+c/ling30.exe
 c/mimo
 c/mimo.exe

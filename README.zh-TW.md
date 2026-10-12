@@ -18,10 +18,10 @@
 因此 colibri 把這一部分留在 RAM 中，其餘的部分，也就是專家，則在模型需要時才從硬碟讀取。
 純 C 實作，每個模型家族一個檔案，不需要 GPU。
 
-目前有十三個引擎可以執行。其中十個用於語言模型：**GLM-5.2/5.3**、
+目前有十四個引擎可以執行。其中十一個用於語言模型：**GLM-5.2/5.3**、
 **GLM-5.3-Flash**、**Inkling**、**Kimi K3**、**DeepSeek V4 Flash**、
 **DeepSeek V4.1 Flash**、**MiMo-V2.6 Flash**（以及 Pro）、**Qwen3.8-Flash-Next**、
-**Qwen3.6**（同一引擎也執行 Qwen3-Coder 與稠密的 Qwen3.8-27B）以及
+**Ling-3.0-flash**、**Qwen3.6**（同一引擎也執行 Qwen3-Coder 與稠密的 Qwen3.8-27B）以及
 **OLMoE**。一個用來生成圖片：**Qwen-Image-2.1**。兩個用來回答決策問題：
 **Laya** 與 **GLiNER2.5-Decide**；第三個決策模型 **Clef** 則執行在
 Qwen3.6 引擎上。[我的機器適合哪一個](#which-model-for-my-machine)
@@ -205,6 +205,7 @@ Starting colibri
 | **DeepSeek V4 Flash**（284B）：支援工具 | `deepseek-v4-flash` | 167 GB | 16 / 32 GB | CUDA、Vulkan | 32 GB 時 0.93 tok/s（Ryzen 7 5800X），63 GB 時 1.24（Ryzen 9 5950X），僅用 CPU；用 CUDA 為 1.5-1.6（RTX 5080，32 GB，兩顆 NVMe） |
 | **MiMo-V2.6 Flash**（309B）：視覺與工具 | `mimo-v2.6-flash` | 172 GB | 32 / 52 GB | Vulkan | 2.34-3.37 tok/s（A，CPU） |
 | **Qwen3.8-Flash-Next**（125B + 51B n-gram）：視覺與工具 | `qwen38-flash-next` | 186 GB | 24 / 32 GB | CUDA、Vulkan（含內建顯示晶片） | 每層 32-96 個專家時 1.91-2.56 tok/s；使用選用的 int4 專家時 3.99（A，CPU） |
+| **Ling-3.0-flash**（124B）：KDA+MLA 混合 MoE，支援工具呼叫 | `ling-3.0-flash` | 245 GB | 16 / 32 GB | CPU | 尚未實測 |
 | **GLM-5.2**（744B）：參考模型，含 MTP head | `glm-5.2` | 429 GB | 16 / 24 GB | CUDA、Vulkan | 25 GB 筆電上冷啟動 0.05-0.1 tok/s；128 GB 的 Ryzen AI Max+ 395 上 1.83；6x RTX 5090 上 9.0-9.2 |
 | GLM-5.3（744B）：同一引擎，不含 MTP head | `glm-5.3` | 419 GB | 16 / 24 GB | CUDA、Vulkan | |
 | **Inkling**（975B）：int4 專家，bf16 稠密權重 | `inkling` | 514 GB | 按下載格式為 120 / 128 GB；經過[稠密部分轉換](docs/inkling.md)後為 25 GB | CUDA、Vulkan | 0.25 tok/s（Ryzen 9 7900，187 GB，RTX A6000） |
@@ -632,6 +633,7 @@ c/
 ├── deepseek_v4.c         DeepSeek V4 Flash  (make deepseek-v4)
 ├── deepseek_v41.c        DeepSeek V4.1 Flash  (make deepseek_v41)
 ├── mimo.c                MiMo-V2.6 Flash and Pro  (make mimo)
+├── ling30.c              Ling-3.0-flash  (make ling30)
 ├── qwen38.c              Qwen3.8-Flash-Next  (make qwen38)
 ├── qwen36.c              Qwen3.6, Qwen3-Coder, Qwen3.8-27B, Clef  (make qwen36)
 ├── olmoe.c               OLMoE  (make olmoe)

@@ -141,6 +141,15 @@ CATALOG = (
         post_install=(("k3_tokenizer", "tokenizer.json"),),
         doc="docs/kimi_k3.md"),
     CatalogModel(
+        id="ling-3.0-flash", family="ling30", name="Ling-3.0-flash",
+        repo="inclusionAI/Ling-3.0-flash", disk_gb=245.0,
+        # 124B BF16 release (~248 GB on disk): ~7 GB always-resident dense
+        # (embed 0.8 + MLA/KDA trunk + norms/head) plus a top-8 expert cache.
+        ram_min_gb=16, ram_good_gb=32, dense_gb=7.0, rank=6, size_class="large",
+        summary="124B hybrid KDA+MLA MoE, 5.1B active; official BF16 checkpoint",
+        exclude=("model_mtp.safetensors",),
+        doc="docs/ling30.md"),
+    CatalogModel(
         id="qwen-image-2.1", family="qwen_image", name="Qwen-Image-2.1",
         repo="Qwen/Qwen-Image-2.1", disk_gb=33.1,
         # docs/qwen-image.md: 9.0 GB peak for one 768x512 image with the text
